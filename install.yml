@@ -1,0 +1,160 @@
+---
+- name: Build and deploy an ansible management node.
+  hosts: localhost
+  gather_facts: true
+  vars:
+    # repo-epel
+    # Role defaults suffice
+    # role-pip
+    # Role defaults suffice, leveraged layer in playbook
+    pip_install_packages:
+      - name: docker
+      - name: docker-compose
+    # role-ansible
+    # Note - this should ultimately be changed to PIP for better package management
+    ansible_install_method: package
+    ## role-docker
+    ## Edition can be one of: 'ce' (Community Edition) or 'ee' (Enterprise Edition).
+    docker_yum_repo_url: https://download.docker.com/linux/centos/docker-{{ docker_edition }}.repo
+    docker_edition: 'ce'
+    docker_package: "docker-{{ docker_edition }}"
+    docker_package_state: latest
+
+  roles:
+    - role: ansible-role-repo-epel
+    - role: ansible-role-pip
+    - role: ansible-role-ansible
+    - role: ansible-role-docker
+
+  tasks:
+
+    - name: Create Folder
+      file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        # mode: 0777
+        state: directory
+      with_items:
+          - /datavol
+          - /datavol/jenkins
+          - /datavol/jenkins/jenkins_home
+          - /datavol/rancher
+          - /datavol/rancher/var_lib_rancher
+          - /datavol/vault
+          - /datavol/vault/config
+          - /datavol/vault/tools
+
+    - name: Copy Jenkins docker-compose file to foler
+      copy:
+        src: ./docker-compose/jenkins/docker-compose.yml
+        dest: /datavol/jenkins/
+
+    - name: Copy giss-jenkins-docker Dockerfile to foler
+      copy:
+        src: ./dockerfiles/giss-jenkins-docker/Dockerfile
+        dest: /datavol/jenkins/
+
+    - name: Build custom Jenkins Docker image with docker_cli
+      docker_image:
+        build:
+          pull: yes
+          path: dockerfiles/giss-jenkins-docker
+        name: giss/jenkins-docker
+        source: build
+        state: build
+
+    - name: Execute a docker build to ensure the image is up-to-date
+      shell: "docker build -t giss/jenkins-docker ."
+      args:
+        chdir: /datavol/jenkins/
+      register: docker_build_output
+
+    - name: Display docker build output
+      debug:
+        var: docker_build_output
+    
+    - name: Deploy Jenkins Docker container via docker_compose
+      docker_compose:
+        project_name: "jenkins"
+        project_src: docker-compose/jenkins
+        state: present
+        stopped: false
+        #restarted: true
+      register: output
+
+    - debug:
+        var: output
+
+    - assert:
+        that:
+          - "'services.jenkins.jenkins-docker.state.running'"
+
+
+    - name: Copy Rancher docker-compose file to foler
+      copy:
+        src: ./docker-compose/rancher/docker-compose.yml
+        dest: /datavol/rancher/
+
+    - name: Deploy Rancher container via docker_compose
+      docker_compose:
+        project_name: "rancher"
+        project_src: docker-compose/rancher
+        state: present
+        stopped: false
+        #restarted: true
+      register: output
+
+    - debug:
+        var: output
+
+    - assert:
+        that:
+          - "'services.rancher.rancher-docker.state.running'"
+
+    - name: Copy Vault config to folder
+      copy:
+        src: ./docker-compose/vault/config
+        dest: /datavol/vault/
+
+    - name: Copy Vault tools to folder
+      copy:
+        src: ./docker-compose/vault/tools
+        dest: /datavol/vault/
+
+    - name: Update vault script permissions
+      file:
+        path: "{{ item }}"
+        # owner: foo
+        # group: foo
+        mode: '0750'
+      with_items:
+        - /datavol/vault/tools/wait-for-it.sh
+        - /datavol/vault/tools/what-is-my-host-ip.sh
+        - /datavol/vault/tools/vault/cubbyhole-wrap-token.sh
+        - /datavol/vault/tools/vault/unwrap-token.sh
+        - /datavol/vault/tools/vault/vault-read.sh
+        - /datavol/vault/tools/vault/vault-write.sh
+        - /datavol/vault/tools/vault/wrap-token.sh
+
+    - name: Copy Vault docker-compose file to foler
+      copy:
+        src: ./docker-compose/vault/docker-compose.yml
+        dest: /datavol/vault/
+
+    - name: Deploy Hashicorp Vault container via docker_compose
+      docker_compose:
+        project_name: "vault"
+        project_src: docker-compose/vault
+        state: present
+        stopped: false
+        #restarted: true
+      register: output
+
+    - debug:
+        var: output
+
+    - assert:
+        that:
+          - "'services.vault.vault-docker.state.running'"
+          - "'services.vault.consul-docker.state.running'"

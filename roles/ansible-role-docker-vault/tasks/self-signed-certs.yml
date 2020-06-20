@@ -1,0 +1,43 @@
+---
+# Tasks to generate self-signed certs for the Docker Private Repo
+
+  - name: Clear Certificate Directory
+    file:
+      path: "{{ docker_registry_dir_certs }}"
+      state: absent
+
+  - name: Re-create Certificate Directory
+    file:
+      path: "{{ docker_registry_dir_certs }}"
+      state: directory
+
+  - name: Generate SSL Cert request data from template
+    template:
+      src: request.conf.j2
+      dest: "{{ docker_registry_dir_certs }}/request.conf"
+
+  - name: Generate Private Key
+    command: openssl genrsa -out "{{ docker_registry_cert_key }}" 4096
+
+  - name: Generate Certificate Signing Request
+    command: >
+       openssl req
+       -new
+       -out "{{ docker_registry_cert_csr }}"
+       -key "{{ docker_registry_cert_key }}"
+       -config "{{ docker_registry_dir_certs }}/request.conf"
+    args:
+      chdir: "{{ docker_registry_dir_certs }}"
+
+  - name: Sign Certificate Request
+    command: >
+       openssl x509
+       -req
+       -days 3650
+       -in "{{ docker_registry_cert_csr }}"
+       -signkey "{{ docker_registry_cert_key }}"
+       -out "{{ docker_registry_cert_crt }}"
+       -extensions v3_req
+       -extfile "{{ docker_registry_dir_certs }}/request.conf"
+    args:
+      chdir: "{{ docker_registry_dir_certs }}"

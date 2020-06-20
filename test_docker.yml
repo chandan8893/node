@@ -1,0 +1,53 @@
+---
+- name: Deploy docker compose service
+  hosts: localhost
+  gather_facts: true
+
+  tasks:
+    - docker_compose:
+        project_src: docker-compose/jenkins
+        state: absent
+
+    - docker_compose:
+        project_src: docker-compose/jenkins
+      register: output
+
+    - debug:
+        var: output
+
+    - docker_compose:
+        project_src: docker-compose/jenkins
+        build: no
+      register: output
+
+    - debug:
+        var: output
+
+    - assert:
+        that: "not output.changed "
+
+    - docker_compose:
+        project_src: docker-compose/jenkins
+        build: no
+        stopped: true
+      register: output
+
+    - debug:
+        var: output
+
+    - assert:
+        that:
+          - "not 'services.jenkins.jenkins-docker.state.running'"
+
+    - docker_compose:
+        project_src: docker-compose/jenkins
+        build: no
+        restarted: true
+      register: output
+
+    - debug:
+        var: output
+
+    - assert:
+        that:
+          - "jenkins.jenkins-docker.state.running"

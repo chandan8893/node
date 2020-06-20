@@ -1,0 +1,62 @@
+---
+# defaults file for ansible-role-docker-vault
+
+# Generic & Docker Compose Parameters
+docker_vault_service_name: docker-vault
+docker_vault_name: registry
+docker_vault_hostname: "{{ docker_vault_name }}"
+docker_vault_image: registry:2
+docker_vault_port_container: 5000
+docker_vault_port_host: 5000
+
+# PATH Parameters
+service_root_dir: /datavol
+docker_vault_dir_root: "{{ service_root_dir }}/{{ docker_vault_service_name }}"
+docker_vault_dir_data: "{{ docker_vault_dir_root }}/data"
+docker_vault_dir_certs: "{{ docker_vault_dir_root }}/certs"
+docker_vault_dir_auth: "{{ docker_vault_dir_root }}/auth"
+
+# Prerequisiste Packages
+pip_install_packages:
+      - name: docker
+      - name: docker-compose
+      - name: pyOpenSSL
+      - name: passlib
+
+# Certificate Parameters
+## TODO: Add LetsEncrypt Support
+certificate_type: self-signed
+cert_key: "{{ docker_vault_dir_certs }}/{{ docker_vault_service_name }}.key"
+cert_csr: "{{ docker_vault_dir_certs }}/{{ docker_vault_service_name }}.csr"
+cert_crt: "{{ docker_vault_dir_certs }}/{{ docker_vault_service_name }}.crt"
+cert_pem: "{{ docker_vault_dir_certs }}/{{ docker_vault_service_name }}.pem"
+
+## Request Template Params
+registry_country: GB
+registry_province: Victoria
+registry_locality: London
+registry_organization: NTT Inc.
+registry_organizational_unit: Group Information Security Services
+registry_common_name: "{{ ansible_fqdn }}"
+registry_altnames:
+  - type: DNS.1
+    name: "{{ ansible_fqdn }}"
+  - type: IP.1
+    name: 127.0.0.1
+  - type: IP.2
+    name: "{{ ansible_default_ipv4.address }}"
+  - type: IP.3
+    name: "{{ ansible_default_ipv6.address }}"
+
+
+# Registry Auth
+docker_vault_auth_file: htpasswd
+docker_repo_user: repo-user
+docker_repo_pass:
+
+## TOOD: Multi User htpasswd Support
+# registry_users:
+#   - username: "{{ docker_repo_user }}"
+#     password: "{{ docker_repo_pass }}"
+#   - username: testuser2
+#     password: testpassword2

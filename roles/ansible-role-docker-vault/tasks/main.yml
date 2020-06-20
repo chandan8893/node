@@ -1,0 +1,62 @@
+---
+# tasks file for ansible-role-docker-registry
+
+# Install OpenSSL
+- name: Install OpenSSL
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - httpd-tools
+    - openssl
+
+- name: Create Folder
+  file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    # mode: 0777
+    state: directory
+  with_items:
+      - "{{ docker_repo_data_volume }}"
+      - "{{ docker_registry_dir_root }}"
+      - "{{ docker_registry_dir_data }}"
+      - "{{ docker_registry_dir_certs }}"
+      - "{{ docker_registry_dir_auth }}"
+
+- name: Generate docker compose file from j2 template
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_registry_dir_root }}/docker-compose.yml"
+
+- name: Generate self-signed certificates
+  include_tasks: self-signed-certs.yml
+  when: certificate_type == 'self-signed'
+
+- name: "Generate htpasswd file for repo"
+  htpasswd:
+    path: "{{ docker_registry_dir_auth }}/{{ docker_registry_auth_file }}"
+    name: "{{ docker_repo_user }}"
+    password: "{{ docker_repo_pass }}"
+    crypt_scheme: bcrypt
+    owner: root
+    group: root
+    mode: 0640
+
+- name: Docker Compose - Pull Container
+  command: docker-compose pull --quiet
+  args:
+    chdir: "{{ docker_registry_dir_root }}"
+  register: output
+
+- debug:
+    var: output
+
+- name: Docker Compose - Start Container
+  command: docker-compose up -d
+  args:
+    chdir: "{{ docker_registry_dir_root }}"
+  register: output
+
+- debug:
+    var: output

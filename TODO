@@ -1,0 +1,7 @@
+Bash file to do the following:
+
+set DNS
+install rsync
+install install ansible
+download deployer from BitBucket
+execute deployer

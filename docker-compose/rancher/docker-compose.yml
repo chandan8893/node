@@ -1,0 +1,13 @@
+version: "2"
+
+services:
+  jenkins:
+    image: rancher/rancher:latest
+    container_name: rancher
+    hostname: rancher
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /datavol/rancher/var_lib_rancher:/var/lib/rancher
